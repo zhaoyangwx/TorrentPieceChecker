@@ -28,6 +28,9 @@ Partial Class Form1
         Me.btnStop = New System.Windows.Forms.Button()
         Me.btnDraw = New System.Windows.Forms.Button()
         Me.ToolTip1 = New System.Windows.Forms.ToolTip(Me.components)
+        Me.btnScaleUp = New System.Windows.Forms.Button()
+        Me.btnScaleDown = New System.Windows.Forms.Button()
+        Me.btnFolderBrowser = New System.Windows.Forms.Button()
         CType(Me.dgv, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.panelMap.SuspendLayout()
         CType(Me.pictureBoxBlk, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -56,15 +59,18 @@ Partial Class Form1
         '
         'dgv
         '
+        Me.dgv.AllowUserToAddRows = False
+        Me.dgv.AllowUserToDeleteRows = False
+        Me.dgv.AllowUserToOrderColumns = True
         Me.dgv.Anchor = CType(((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Bottom) _
             Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
         Me.dgv.Columns.AddRange(New System.Windows.Forms.DataGridViewColumn() {Me.DataGridViewTextBoxColumn1, Me.DataGridViewTextBoxColumn2, Me.DataGridViewTextBoxColumn3})
         Me.dgv.Location = New System.Drawing.Point(10, 68)
-        Me.dgv.MultiSelect = False
         Me.dgv.Name = "dgv"
         Me.dgv.ScrollBars = System.Windows.Forms.ScrollBars.Vertical
         Me.dgv.Size = New System.Drawing.Size(284, 339)
         Me.dgv.TabIndex = 5
+        Me.dgv.VirtualMode = True
         '
         'DataGridViewTextBoxColumn1
         '
@@ -112,7 +118,7 @@ Partial Class Form1
             Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.txtDir.Location = New System.Drawing.Point(10, 41)
         Me.txtDir.Name = "txtDir"
-        Me.txtDir.Size = New System.Drawing.Size(959, 21)
+        Me.txtDir.Size = New System.Drawing.Size(878, 21)
         Me.txtDir.TabIndex = 4
         Me.txtDir.Text = "I:\Minerva_Myrient"
         '
@@ -149,11 +155,49 @@ Partial Class Form1
         Me.btnDraw.Text = "刷新"
         Me.btnDraw.UseVisualStyleBackColor = True
         '
+        'btnScaleUp
+        '
+        Me.btnScaleUp.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.btnScaleUp.Enabled = False
+        Me.btnScaleUp.FlatStyle = System.Windows.Forms.FlatStyle.System
+        Me.btnScaleUp.Location = New System.Drawing.Point(840, 12)
+        Me.btnScaleUp.Name = "btnScaleUp"
+        Me.btnScaleUp.Size = New System.Drawing.Size(21, 23)
+        Me.btnScaleUp.TabIndex = 8
+        Me.btnScaleUp.Text = "+"
+        Me.btnScaleUp.UseVisualStyleBackColor = True
+        '
+        'btnScaleDown
+        '
+        Me.btnScaleDown.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.btnScaleDown.Enabled = False
+        Me.btnScaleDown.FlatStyle = System.Windows.Forms.FlatStyle.System
+        Me.btnScaleDown.Location = New System.Drawing.Point(867, 12)
+        Me.btnScaleDown.Name = "btnScaleDown"
+        Me.btnScaleDown.Size = New System.Drawing.Size(21, 23)
+        Me.btnScaleDown.TabIndex = 9
+        Me.btnScaleDown.Text = "-"
+        Me.btnScaleDown.UseVisualStyleBackColor = True
+        '
+        'btnFolderBrowser
+        '
+        Me.btnFolderBrowser.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.btnFolderBrowser.FlatStyle = System.Windows.Forms.FlatStyle.System
+        Me.btnFolderBrowser.Location = New System.Drawing.Point(894, 39)
+        Me.btnFolderBrowser.Name = "btnFolderBrowser"
+        Me.btnFolderBrowser.Size = New System.Drawing.Size(75, 23)
+        Me.btnFolderBrowser.TabIndex = 10
+        Me.btnFolderBrowser.Text = "选择"
+        Me.btnFolderBrowser.UseVisualStyleBackColor = True
+        '
         'Form1
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 12.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.ClientSize = New System.Drawing.Size(981, 559)
+        Me.Controls.Add(Me.btnFolderBrowser)
+        Me.Controls.Add(Me.btnScaleDown)
+        Me.Controls.Add(Me.btnScaleUp)
         Me.Controls.Add(Me.btnDraw)
         Me.Controls.Add(Me.btnStop)
         Me.Controls.Add(Me.txtInfo)
@@ -163,6 +207,7 @@ Partial Class Form1
         Me.Controls.Add(Me.panelMap)
         Me.Controls.Add(Me.txtDir)
         Me.DoubleBuffered = True
+        Me.KeyPreview = True
         Me.Name = "Form1"
         Me.Text = "Torrent Piece Checker PRO"
         CType(Me.dgv, System.ComponentModel.ISupportInitialize).EndInit()
@@ -181,4 +226,7 @@ Partial Class Form1
     Friend WithEvents DataGridViewTextBoxColumn3 As DataGridViewTextBoxColumn
     Friend WithEvents pictureBoxBlk As PictureBox
     Friend WithEvents ToolTip1 As ToolTip
+    Friend WithEvents btnScaleUp As Button
+    Friend WithEvents btnScaleDown As Button
+    Friend WithEvents btnFolderBrowser As Button
 End Class

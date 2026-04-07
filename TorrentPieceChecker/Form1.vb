@@ -7,6 +7,9 @@ Imports System.Security.Cryptography
 Imports System.Globalization
 Imports System.Windows.Forms.VisualStyles.VisualStyleElement
 Imports System.Text
+Imports System.Windows.Forms.AxHost
+Imports System.ComponentModel
+Imports System.Buffers
 
 Public Class Form1
 
@@ -18,28 +21,29 @@ Public Class Form1
     Private blockSize As Integer = 8
     Private gap As Integer = 1
     Private cols As Integer = 1
-    Private torrentLoaded As Boolean =False
+    Private torrentLoaded As Boolean = False
     Private stopFlag As Boolean = False
     Private forceRedraw As Boolean = False
 
     ' 缓存上一次状态（用于局部刷新）
     Private lastStates() As Integer = {}
-    Private Sub InitMap()
+    Private Sub InitMap(Optional ByVal AutoBlockSize As Boolean = True)
 
         If Pieces Is Nothing Then Return
-
-        ' 自动缩放（关键优化）
-        If Pieces.Count > 200000 Then blockSize = 2
-        If Pieces.Count > 50000 Then blockSize = 4
-        If Pieces.Count < 10000 Then blockSize = 8
+        If AutoBlockSize Then
+            ' 自动缩放（关键优化）
+            If Pieces.Count > 200000 Then blockSize = 2
+            If Pieces.Count > 50000 Then blockSize = 4
+            If Pieces.Count < 10000 Then blockSize = 8
+        End If
 
         Dim cell = blockSize + gap
-        cols = Math.Max(1, panelMap.Width \ (blockSize + gap))
+        cols = Math.Max(1, (panelMap.Width - 20) \ (blockSize + gap))
         Dim rows As Integer = CInt(Math.Ceiling(Pieces.Count / cols))
         Dim bmpW = cols * cell
         Dim bmpH = rows * cell
         ' 防止极端大（可选保护）
-        If bmpH > 30000 Then bmpH = 30000 ' 可调
+        If bmpH > 32767 Then bmpH = 32767 ' 可调
 
         mapBitmap?.Dispose()
         mapBitmap = New Bitmap(bmpW, bmpH)
@@ -56,64 +60,104 @@ Public Class Form1
     Private Sub btnOpen_Click(sender As Object, e As EventArgs) Handles btnOpen.Click
         Dim ofd As New OpenFileDialog()
         If ofd.ShowDialog() = DialogResult.OK Then
-            Dim res = TorrentMapper.Load(ofd.FileName)
+            Dim res = TorrentMapper.Load(ofd.FileName, Sub(i As Long, piececount As Long)
+                                                           If i Mod 1000 = 0 Then
+                                                               txtInfo.Text = $"Load block {i + 1}/{piececount}"
+                                                               Application.DoEvents()
+                                                           End If
+                                                       End Sub)
             TorrentObj = res.Item1
             Pieces = res.Item2
-
-            dgv.Rows.Clear()
-
-            For Each p In Pieces
-                dgv.Rows.Add(True, p.Index, "未校验")
-            Next
-
-            'DrawMap()
+            dgv.RowCount = Pieces.Count
             lastStates = {}
             InitMap()
             DrawMapFast()
+            txtInfo.Text = $"Loaded: {ofd.FileName}{vbCrLf}Piece count: {Pieces.Count}"
             btnCheck.Enabled = True
             btnDraw.Enabled = True
+            btnScaleUp.Enabled = True
+            btnScaleDown.Enabled = True
             torrentLoaded = True
         End If
     End Sub
-
     Private Sub btnCheck_Click(sender As Object, e As EventArgs) Handles btnCheck.Click
         stopFlag = False
+        Dim fileStreams As New Dictionary(Of String, FileStream)
+        Dim lastRefreshTime As Date = Now
+        DrawMapFast()
         For i = 0 To Pieces.Count - 1
-            Dim row = dgv.Rows(i)
-            If Not CBool(row.Cells(0).Value) Then Continue For
+            If Not Pieces(i).Checked Then Continue For
 
-            Dim state = PieceChecker.Check(TorrentObj, Pieces(i), txtDir.Text)
+            Dim state = PieceChecker.Check(TorrentObj, Pieces(i), txtDir.Text, fileStreams)
             Pieces(i).State = state
+            If state = 1 Then Pieces(i).Checked = False
+            If state = 2 OrElse (Now - lastRefreshTime).TotalMilliseconds >= 300 Then
+                lastRefreshTime = Now
+                dgv.InvalidateRow(i)
+                If forceRedraw Then
+                    forceRedraw = False
+                    InitMap(False)
+                End If
+                DrawMapFast()
+                EnsureRowVisible(i)
+            End If
 
-            If state = 1 Then
-                row.DefaultCellStyle.BackColor = Color.LightGreen
-                row.Cells(0).Value = False
-                row.Cells(2).Value = "OK"
-            Else
-                row.DefaultCellStyle.BackColor = Color.LightCoral
-                row.Cells(2).Value = "FAIL"
-            End If
-            If forceRedraw Then
-                forceRedraw = False
-                InitMap()
-            End If
-            DrawMapFast()
-            EnsureRowVisible(i)
             Application.DoEvents()
             If stopFlag Then
+                For Each fs In fileStreams.Values
+                    fs.Dispose()
+                Next
                 Exit For
             End If
         Next
-
+        For Each fs In fileStreams.Values
+            fs.Dispose()
+        Next
     End Sub
     Private Sub btnStop_Click(sender As Object, e As EventArgs) Handles btnStop.Click
         stopFlag = True
     End Sub
     Private Sub btnDraw_Click(sender As Object, e As EventArgs) Handles btnDraw.Click
-        InitMap()
+        InitMap(False)
         DrawMapFast()
     End Sub
+    Private Sub dgv_CellValueNeeded(sender As Object, e As DataGridViewCellValueEventArgs) Handles dgv.CellValueNeeded
 
+        If e.RowIndex < 0 OrElse e.RowIndex >= Pieces.Count Then Return
+
+        Dim p = Pieces(e.RowIndex)
+
+        Select Case e.ColumnIndex
+            Case 0 ' checkbox
+                e.Value = (p.Checked)
+
+            Case 1 ' index
+                e.Value = p.Index
+
+            Case 2 ' 状态
+                Select Case p.State
+                    Case 0 : e.Value = "未校验"
+                    Case 1 : e.Value = "OK"
+                    Case 2 : e.Value = "FAIL"
+                End Select
+        End Select
+
+    End Sub
+    Private Sub dgv_RowPrePaint(sender As Object, e As DataGridViewRowPrePaintEventArgs) Handles dgv.RowPrePaint
+        If Pieces Is Nothing Then Exit Sub
+        If e.RowIndex < 0 OrElse e.RowIndex >= Pieces.Count Then Exit Sub
+        Dim p = Pieces(e.RowIndex)
+
+        Select Case p.State
+            Case 1
+                dgv.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.LightGreen
+            Case 2
+                dgv.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.LightCoral
+            Case Else
+                dgv.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.White
+        End Select
+
+    End Sub
     Private Sub EnsureRowVisible(i As Integer)
 
         If i < 0 OrElse i >= dgv.RowCount Then Return
@@ -126,46 +170,9 @@ Public Class Form1
         If i >= first AndAlso i <= last Then Return
 
         ' 👇 不在范围 → 滚动（居中更舒服）
-        Dim target = Math.Max(0, i - visibleCount \ 2)
+        Dim target = Math.Max(0, i - visibleCount \ 3)
         dgv.FirstDisplayedScrollingRowIndex = target
 
-    End Sub
-    Private Sub DrawMap()
-
-        If Pieces Is Nothing OrElse Pieces.Count = 0 Then Return
-
-        Dim bmp As New Bitmap(panelMap.Width, panelMap.Height)
-        Dim g = Graphics.FromImage(bmp)
-
-        g.Clear(Color.Black)
-
-        ' ===== 参数（可调）=====
-        Dim blockSize As Integer = 8      ' 小方块尺寸
-        Dim gap As Integer = 1            ' 间距
-
-        Dim usableWidth = panelMap.Width
-        Dim cols As Integer = Math.Max(1, usableWidth \ (blockSize + gap))
-
-        For i = 0 To Pieces.Count - 1
-
-            Dim row = i \ cols
-            Dim col = i Mod cols
-
-            Dim x = col * (blockSize + gap)
-            Dim y = row * (blockSize + gap)
-
-            If y > panelMap.Height Then Exit For
-
-            Dim c As Color = Color.Gray
-            If Pieces(i).State = 1 Then c = Color.LimeGreen
-            If Pieces(i).State = 2 Then c = Color.Red
-
-            Using br As New SolidBrush(c)
-                g.FillRectangle(br, x, y, blockSize, blockSize)
-            End Using
-        Next
-
-        panelMap.BackgroundImage = bmp
     End Sub
     Private Sub DrawMapFast()
 
@@ -212,7 +219,8 @@ Public Class Form1
 
         ' 先统计
         For Each f In p.Files
-            If IO.File.Exists(IO.Path.Combine(txtDir.Text, f)) Then
+            If f.Item1.StartsWith(".pad", StringComparison.OrdinalIgnoreCase) Then Continue For
+            If IO.File.Exists(IO.Path.Combine(txtDir.Text, f.Item1)) Then
                 okCount += 1
             Else
                 missCount += 1
@@ -226,14 +234,13 @@ Public Class Form1
         sb.AppendLine()
 
         ' 缺失优先排序
-        For Each f In p.Files.OrderBy(Function(x) IO.File.Exists(IO.Path.Combine(txtDir.Text, x)))
-
-            Dim exist As Boolean = IO.File.Exists(IO.Path.Combine(txtDir.Text, f))
-
+        For Each f In p.Files.OrderBy(Function(x) IO.File.Exists(IO.Path.Combine(txtDir.Text, x.Item1)))
+            If f.Item1.StartsWith(".pad", StringComparison.OrdinalIgnoreCase) Then Continue For
+            Dim exist As Boolean = IO.File.Exists(IO.Path.Combine(txtDir.Text, f.Item1))
             If exist Then
-                sb.Append("  ").AppendLine(f)
+                sb.Append("  ").AppendLine(f.Item1)
             Else
-                sb.Append("× ").AppendLine(f)
+                sb.Append("× ").AppendLine(f.Item1)
             End If
 
         Next
@@ -244,13 +251,14 @@ Public Class Form1
 
     Private Sub pictureBoxBlk_MouseWheel(sender As Object, e As MouseEventArgs) Handles pictureBoxBlk.MouseWheel
         If Not torrentLoaded Then Exit Sub
+        If Not CtrlPressing Then Exit Sub
         If e.Delta > 0 Then
             blockSize += 1
         Else
-            blockSize = Math.Max(2, blockSize - 1)
+            blockSize = Math.Max(1, blockSize - 1)
         End If
 
-        InitMap()
+        InitMap(False)
         DrawMapFast()
     End Sub
     Private Sub pictureBoxBlk_MouseMove(sender As Object, e As MouseEventArgs) Handles pictureBoxBlk.MouseMove
@@ -274,58 +282,151 @@ Public Class Form1
         forceRedraw = True
     End Sub
 
+    Private Sub btnScaleUp_Click(sender As Object, e As EventArgs) Handles btnScaleUp.Click
+        If Not torrentLoaded Then Exit Sub
+        blockSize += 1
+        InitMap(False)
+        DrawMapFast()
+    End Sub
+
+    Private Sub btnScaleDown_Click(sender As Object, e As EventArgs) Handles btnScaleDown.Click
+        If Not torrentLoaded Then Exit Sub
+        blockSize = Math.Max(1, blockSize - 1)
+        InitMap(False)
+        DrawMapFast()
+    End Sub
+
+    Private Sub btnFolderBrowser_Click(sender As Object, e As EventArgs) Handles btnFolderBrowser.Click
+        Dim fbd As New FolderBrowserDialog
+        If fbd.ShowDialog = DialogResult.OK Then
+            txtDir.Text = fbd.SelectedPath
+        End If
+    End Sub
+
+    Private Sub Form1_Load(sender As Object, e As EventArgs) Handles Me.Load
+        txtDir.Text = My.Settings.lastPath
+    End Sub
+
+    Private Sub Form1_Closing(sender As Object, e As CancelEventArgs) Handles Me.Closing
+        My.Settings.lastPath = txtDir.Text
+    End Sub
+
+    Private CtrlPressing As Boolean = False
+    Private Sub Form1_KeyDown(sender As Object, e As KeyEventArgs) Handles Me.KeyDown
+        If e.Control Then
+            CtrlPressing = True
+        End If
+    End Sub
+    Private Sub Form1_KeyUp(sender As Object, e As KeyEventArgs) Handles Me.KeyUp
+        If Not e.Control Then
+            CtrlPressing = False
+            If e.KeyCode = Keys.Enter OrElse e.KeyCode = Keys.Space Then
+                For Each r As DataGridViewRow In dgv.SelectedRows
+                    Pieces(r.Index).Checked = True
+                Next
+                dgv.Invalidate()
+            ElseIf e.KeyCode = Keys.Delete OrElse e.KeyCode = Keys.Back Then
+                For Each r As DataGridViewRow In dgv.SelectedRows
+                    Pieces(r.Index).Checked = False
+                Next
+                dgv.Invalidate()
+            End If
+        End If
+    End Sub
 End Class
 
 
 
 
 Public Class PieceChecker
+    <ThreadStatic>
+    Private Shared sha1hasher As Security.Cryptography.SHA1 = SHA1.Create()
+    Public Shared Function Check(t As Torrent, p As PieceModel, baseDir As String,
+            fileStreams As Dictionary(Of String, FileStream)) As Integer
 
-    Public Shared Function Check(t As Torrent, p As PieceModel, baseDir As String) As Integer
-
-        Dim sha1hasher = SHA1.Create()
-        Dim buffer(p.Length - 1) As Byte
+        Dim buffer() As Byte = ArrayPool(Of Byte).Shared.Rent(p.Length)
 
         Dim written As Integer = 0
         Dim globalOffset = p.StartOffset
 
-        Dim files = If(t.FileMode = TorrentFileMode.Single,
-            {t.File}.Select(Function(f) (f.FileName, f.FileSize)),
-            t.Files.Select(Function(f) (f.FullPath, f.FileSize)))
+        For Each f In p.Files
 
-        Dim cur As Long = 0
-
-        For Each f In files
-
-            Dim start = cur
-            Dim [end] = cur + f.Item2
+            Dim start = f.FileOffset
+            Dim [end] = f.FileOffset + f.FileSize
 
             If globalOffset < [end] AndAlso written < p.Length Then
 
-                Dim readStart = Math.Max(0, globalOffset - start)
-                Dim path = IO.Path.Combine(baseDir, f.Item1)
+                If Not f.Item1.StartsWith(".pad", StringComparison.OrdinalIgnoreCase) Then
 
-                If Not File.Exists(path) Then Return 2
+                    Dim path = IO.Path.Combine(baseDir, f.Item1)
 
-                Using fs As New FileStream(path, FileMode.Open, FileAccess.Read)
-                    fs.Seek(readStart, SeekOrigin.Begin)
+                    ' 🔥 每次都判断存在（满足你的需求）
+                    If Not File.Exists(path) Then
+
+                        ' 👉 如果之前有缓存，要清掉
+                        If fileStreams.ContainsKey(path) Then
+                            fileStreams(path).Dispose()
+                            fileStreams.Remove(path)
+                        End If
+                        ArrayPool(Of Byte).Shared.Return(buffer)
+                        Return 2
+                    End If
+
+                    ' 👉 获取或创建 FileStream（核心优化）
+                    Dim fs As FileStream = Nothing
+
+                    If Not fileStreams.TryGetValue(path, fs) Then
+                        Try
+                            fs = New FileStream(
+                                                   path,
+                                                   FileMode.Open,
+                                                   FileAccess.Read,
+                                                   FileShare.ReadWrite,   ' 🔥 支持用户修改文件
+                                                   4096,
+                                                   FileOptions.SequentialScan)
+                        Catch ex As Exception
+                            ArrayPool(Of Byte).Shared.Return(buffer)
+                            Return 2
+                        End Try
+
+
+                        fileStreams(path) = fs
+                    End If
+
+                    ' 👉 计算读取位置
+                    Dim readStart = Math.Max(0, globalOffset - start)
+
+                    If fs.Position <> readStart Then
+                        fs.Position = readStart
+                    End If
 
                     While written < p.Length AndAlso fs.Position < fs.Length
-                        Dim r = fs.Read(buffer, written, p.Length - written)
+
+                        Dim fileRemain = [end] - (start + readStart)
+                        If fileRemain <= 0 Then Exit While
+
+                        Dim need = Math.Min(p.Length - written, fileRemain)
+
+                        Dim r = fs.Read(buffer, written, need)
                         If r = 0 Then Exit While
+
                         written += r
+
                     End While
-                End Using
+
+                End If
+
             End If
 
-            cur += f.Item2
         Next
 
-        Dim hash = sha1hasher.ComputeHash(buffer)
+        Dim hash = sha1hasher.ComputeHash(buffer, 0, p.Length)
+        ArrayPool(Of Byte).Shared.Return(buffer)
         Dim target(19) As Byte
         Array.Copy(t.Pieces, p.Index * 20, target, 0, 20)
 
         Return If(hash.SequenceEqual(target), 1, 2)
+
     End Function
 
 End Class
@@ -335,7 +436,7 @@ Public Class PieceModel
     Public Property Index As Integer
     Public Property StartOffset As Long
     Public Property Length As Long
-    Public Property Files As New List(Of String)
+    Public Property Files As New List(Of (Name As String, FileOffset As Long, FileSize As Long))
     Public Property State As Integer = 0 '0=未校验 1=通过 2=失败
     Public Property Checked As Boolean = True
 End Class
@@ -344,53 +445,75 @@ End Class
 
 Public Class TorrentMapper
 
-    Public Shared Function Load(torrentPath As String) As (Torrent, List(Of PieceModel))
+    Public Shared Function Load(torrentPath As String, Optional ByVal ProgressReport As Action(Of Long, Long) = Nothing) As (Torrent, List(Of PieceModel))
         Dim parser = New BencodeParser()
         Dim t = parser.Parse(Of Torrent)(torrentPath)
 
-        Dim pieces As New List(Of PieceModel)
-        Dim pieceCount = t.Pieces.Length \ 20
-        Dim pieceSize = t.PieceSize
 
+        Dim pieceSize = t.PieceSize
+        Dim pieceCount = t.Pieces.Length \ 20
+        Dim pieces As New List(Of PieceModel)(pieceCount)
+
+        ' 🔥 必须 ToList
         Dim files = If(t.FileMode = TorrentFileMode.Single,
-            {t.File}.Select(Function(f) (f.FileName, f.FileSize)),
-            t.Files.Select(Function(f) (f.FullPath, f.FileSize)))
-        Dim totalSize As Long
-        If t.FileMode = TorrentFileMode.Single Then
-            totalSize = t.File.FileSize
-        Else
-            totalSize = t.Files.Sum(Function(f) f.FileSize)
-        End If
+            {t.File}.Select(Function(f) (f.FileName, f.FileSize)).ToList(),
+            t.Files.Select(Function(f) (f.FullPath, f.FileSize)).ToList())
+
+        Dim totalSize As Long = 0
+        For Each f In files
+            totalSize += f.Item2
+        Next
+
+        Dim fileIndex As Integer = 0
+        Dim fileOffset As Long = 0
 
         For i = 0 To pieceCount - 1
-            Dim remaining = totalSize - CLng(i) * pieceSize
+
+            Dim pieceStart = CLng(i) * pieceSize
+            Dim remaining = totalSize - pieceStart
+            Dim length = CInt(Math.Min(pieceSize, remaining))
+
             Dim p As New PieceModel With {
                 .Index = i,
-                .StartOffset = CLng(i) * pieceSize,
-                .Length = Math.Min(pieceSize, remaining)
+                .StartOffset = pieceStart,
+                .Length = length,
+                .Files = New List(Of (Name As String, FileOffset As Long, FileSize As Long))(2)
             }
 
-            Dim remain = pieceSize
-            Dim offset = p.StartOffset
-            Dim cur As Long = 0
+            ' 👉 推进 fileIndex（只前进，不回退）
+            While fileIndex < files.Count AndAlso pieceStart >= fileOffset + files(fileIndex).Item2
+                fileOffset += files(fileIndex).Item2
+                fileIndex += 1
+            End While
 
-            For Each f In files
-                Dim start = cur
-                Dim [end] = cur + f.Item2
+            Dim curOffset = pieceStart
+            Dim remain = length
+            Dim idx = fileIndex
+            Dim off = fileOffset
 
-                If offset < [end] AndAlso offset + remain > start Then
-                    p.Files.Add(f.Item1)
-                End If
+            While remain > 0 AndAlso idx < files.Count
 
-                cur += f.Item2
-            Next
+                Dim fileSize = files(idx).Item2
+                Dim fileEnd = off + fileSize
+
+                p.Files.Add((files(idx).Item1, off, fileSize))
+
+                Dim take = Math.Min(remain, fileEnd - curOffset)
+
+                remain -= take
+                curOffset += take
+
+                off += fileSize
+                idx += 1
+            End While
 
             pieces.Add(p)
+            If ProgressReport IsNot Nothing Then ProgressReport(i, pieceCount)
         Next
+
 
         Return (t, pieces)
     End Function
-
 End Class
 Public Class DoubleBufferedPanel
     Inherits Panel
