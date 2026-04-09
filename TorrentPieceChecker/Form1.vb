@@ -1,13 +1,8 @@
 
-Imports System.Drawing
 Imports BencodeNET.Torrents
 Imports System.IO
 Imports BencodeNET.Parsing
 Imports System.Security.Cryptography
-Imports System.Globalization
-Imports System.Windows.Forms.VisualStyles.VisualStyleElement
-Imports System.Text
-Imports System.Windows.Forms.AxHost
 Imports System.ComponentModel
 Imports System.Buffers
 
@@ -91,7 +86,7 @@ Public Class Form1
             Dim state = PieceChecker.Check(TorrentObj, Pieces(i), txtDir.Text, fileStreams)
             Pieces(i).State = state
             If state = 1 Then Pieces(i).Checked = False
-            If state = 2 OrElse (Now - lastRefreshTime).TotalMilliseconds >= 300 Then
+            If state >= 2 OrElse (Now - lastRefreshTime).TotalMilliseconds >= 300 Then
                 lastRefreshTime = Now
                 dgv.InvalidateRow(i)
                 If forceRedraw Then
@@ -122,7 +117,6 @@ Public Class Form1
         DrawMapFast()
     End Sub
     Private Sub dgv_CellValueNeeded(sender As Object, e As DataGridViewCellValueEventArgs) Handles dgv.CellValueNeeded
-
         If e.RowIndex < 0 OrElse e.RowIndex >= Pieces.Count Then Return
 
         Dim p = Pieces(e.RowIndex)
@@ -139,9 +133,17 @@ Public Class Form1
                     Case 0 : e.Value = "未校验"
                     Case 1 : e.Value = "OK"
                     Case 2 : e.Value = "FAIL"
+                    Case 3 : e.Value = "文件缺失"
+                    Case 4 : e.Value = "文件无法打开"
                 End Select
         End Select
-
+    End Sub
+    Private Sub dgv_CellValuePushed(sender As Object, e As DataGridViewCellValueEventArgs) Handles dgv.CellValuePushed
+        If e.RowIndex < 0 OrElse e.RowIndex >= Pieces.Count Then Return
+        Dim p = Pieces(e.RowIndex)
+        If e.ColumnIndex = 0 Then
+            p.Checked = e.Value
+        End If
     End Sub
     Private Sub dgv_RowPrePaint(sender As Object, e As DataGridViewRowPrePaintEventArgs) Handles dgv.RowPrePaint
         If Pieces Is Nothing Then Exit Sub
@@ -153,6 +155,10 @@ Public Class Form1
                 dgv.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.LightGreen
             Case 2
                 dgv.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.LightCoral
+            Case 3
+                dgv.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.Orange
+            Case 3
+                dgv.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.Plum
             Case Else
                 dgv.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.White
         End Select
@@ -190,8 +196,10 @@ Public Class Form1
 
 
             Dim c As Color = Color.Gray
-            If Pieces(i).State = 1 Then c = Color.LimeGreen
-            If Pieces(i).State = 2 Then c = Color.Red
+            If Pieces(i).State = PieceModel.PieceState.Pass Then c = Color.LimeGreen
+            If Pieces(i).State = PieceModel.PieceState.Fail Then c = Color.Red
+            If Pieces(i).State = PieceModel.PieceState.FileMissing Then c = Color.Orange
+            If Pieces(i).State = PieceModel.PieceState.CannotOpenFile Then c = Color.DarkViolet
 
             Using br As New SolidBrush(c)
                 mapGraphics.FillRectangle(br, x, y, blockSize, blockSize)
@@ -202,14 +210,7 @@ Public Class Form1
 
         pictureBoxBlk.Invalidate() ' 只触发重绘
     End Sub
-    Private Sub pictureBoxBlk_MouseClick(sender As Object, e As MouseEventArgs) Handles pictureBoxBlk.MouseClick
-        If Not torrentLoaded Then Exit Sub
-        Dim col = e.X \ (blockSize + gap)
-        Dim row = e.Y \ (blockSize + gap)
-
-        Dim idx = row * cols + col
-        If idx < 0 OrElse idx >= Pieces.Count Then Return
-
+    Private Sub PrintBlockDetails(idx As Integer)
         Dim p = Pieces(idx)
 
         Dim sb As New System.Text.StringBuilder(256)
@@ -219,8 +220,8 @@ Public Class Form1
 
         ' 先统计
         For Each f In p.Files
-            If f.Item1.StartsWith(".pad", StringComparison.OrdinalIgnoreCase) Then Continue For
-            If IO.File.Exists(IO.Path.Combine(txtDir.Text, f.Item1)) Then
+            If f.Name.StartsWith(".pad", StringComparison.OrdinalIgnoreCase) Then Continue For
+            If IO.File.Exists(IO.Path.Combine(txtDir.Text, f.Name)) Then
                 okCount += 1
             Else
                 missCount += 1
@@ -234,19 +235,28 @@ Public Class Form1
         sb.AppendLine()
 
         ' 缺失优先排序
-        For Each f In p.Files.OrderBy(Function(x) IO.File.Exists(IO.Path.Combine(txtDir.Text, x.Item1)))
-            If f.Item1.StartsWith(".pad", StringComparison.OrdinalIgnoreCase) Then Continue For
-            Dim exist As Boolean = IO.File.Exists(IO.Path.Combine(txtDir.Text, f.Item1))
+        For Each f In p.Files.OrderBy(Function(x) IO.File.Exists(IO.Path.Combine(txtDir.Text, x.Name)))
+            If f.Name.StartsWith(".pad", StringComparison.OrdinalIgnoreCase) Then Continue For
+            Dim exist As Boolean = IO.File.Exists(IO.Path.Combine(txtDir.Text, f.Name))
             If exist Then
-                sb.Append("  ").AppendLine(f.Item1)
+                sb.Append("  ").AppendLine(f.Name)
             Else
-                sb.Append("× ").AppendLine(f.Item1)
+                sb.Append("× ").AppendLine(f.Name)
             End If
 
         Next
 
         txtInfo.Text = sb.ToString()
+    End Sub
+    Private Sub pictureBoxBlk_MouseClick(sender As Object, e As MouseEventArgs) Handles pictureBoxBlk.MouseClick
+        If Not torrentLoaded Then Exit Sub
+        Dim col = e.X \ (blockSize + gap)
+        Dim row = e.Y \ (blockSize + gap)
 
+        Dim idx = row * cols + col
+        If idx < 0 OrElse idx >= Pieces.Count Then Return
+        PrintBlockDetails(idx)
+        EnsureRowVisible(idx)
     End Sub
 
     Private Sub pictureBoxBlk_MouseWheel(sender As Object, e As MouseEventArgs) Handles pictureBoxBlk.MouseWheel
@@ -333,6 +343,49 @@ Public Class Form1
             End If
         End If
     End Sub
+
+    Private Sub dgv_CellClick(sender As Object, e As DataGridViewCellEventArgs) Handles dgv.CellClick
+        If Not torrentLoaded Then Exit Sub
+        PrintBlockDetails(e.RowIndex)
+    End Sub
+
+    Private Sub chkState0_CheckedChanged(sender As Object, e As EventArgs) Handles chkState0.CheckedChanged
+        If Not torrentLoaded Then Exit Sub
+        For Each p In Pieces
+            If p.State = 0 Then p.Checked = chkState0.Checked
+        Next
+        dgv.Invalidate()
+    End Sub
+
+    Private Sub chkState1_CheckedChanged(sender As Object, e As EventArgs) Handles chkState1.CheckedChanged
+        If Not torrentLoaded Then Exit Sub
+        For Each p In Pieces
+            If p.State >= 2 Then p.Checked = chkState1.Checked
+        Next
+        dgv.Invalidate()
+    End Sub
+
+    Private Sub btnImportPieces_Click(sender As Object, e As EventArgs) Handles btnImportPieces.Click
+        With (New OpenFileDialog With {.Filter = "xml|*.xml|any|*.*"})
+            If .ShowDialog = DialogResult.OK Then
+                Dim imp As PieceModelSaver = PieceModelSaver.FromXML(IO.File.ReadAllText(.FileName))
+                If imp.SaveData IsNot Nothing AndAlso imp.SaveData.Count > 0 Then
+                    Pieces = imp.SaveData
+                    dgv.Invalidate()
+                End If
+            End If
+        End With
+    End Sub
+
+    Private Sub btnExportPieces_Click(sender As Object, e As EventArgs) Handles btnExportPieces.Click
+        With (New SaveFileDialog With {.Filter = "xml|*.xml|any|*.*"})
+            If .ShowDialog = DialogResult.OK Then
+                Dim exp As New PieceModelSaver With {.SaveData = Pieces}
+                exp.SaveSerializedText(.FileName)
+            End If
+        End With
+    End Sub
+
 End Class
 
 
@@ -356,9 +409,9 @@ Public Class PieceChecker
 
             If globalOffset < [end] AndAlso written < p.Length Then
 
-                If Not f.Item1.StartsWith(".pad", StringComparison.OrdinalIgnoreCase) Then
+                If Not f.Name.StartsWith(".pad", StringComparison.OrdinalIgnoreCase) Then
 
-                    Dim path = IO.Path.Combine(baseDir, f.Item1)
+                    Dim path = IO.Path.Combine(baseDir, f.Name)
 
                     ' 🔥 每次都判断存在（满足你的需求）
                     If Not File.Exists(path) Then
@@ -369,7 +422,7 @@ Public Class PieceChecker
                             fileStreams.Remove(path)
                         End If
                         ArrayPool(Of Byte).Shared.Return(buffer)
-                        Return 2
+                        Return 3
                     End If
 
                     ' 👉 获取或创建 FileStream（核心优化）
@@ -386,7 +439,7 @@ Public Class PieceChecker
                                                    FileOptions.SequentialScan)
                         Catch ex As Exception
                             ArrayPool(Of Byte).Shared.Return(buffer)
-                            Return 2
+                            Return 4
                         End Try
 
 
@@ -413,7 +466,10 @@ Public Class PieceChecker
                         written += r
 
                     End While
-
+                    If fs.Position = fs.Length Then
+                        fs.Close()
+                        fileStreams.Remove(path)
+                    End If
                 End If
 
             End If
@@ -431,17 +487,61 @@ Public Class PieceChecker
 
 End Class
 
-
+<Serializable>
 Public Class PieceModel
     Public Property Index As Integer
     Public Property StartOffset As Long
     Public Property Length As Long
-    Public Property Files As New List(Of (Name As String, FileOffset As Long, FileSize As Long))
+    Public Property Files As New List(Of FileSegment)
     Public Property State As Integer = 0 '0=未校验 1=通过 2=失败
+    Public Enum PieceState
+        Unknown = 0I
+        Pass = 1I
+        Fail = 2I
+        FileMissing = 3I
+        CannotOpenFile = 4I
+    End Enum
     Public Property Checked As Boolean = True
+    <Serializable>
+    Public Class FileSegment
+        Public Name As String
+        Public FileOffset As Long
+        Public FileSize As Long
+        Public Sub New()
+
+        End Sub
+        Public Sub New(nm As String, ofs As Long, sz As Long)
+            Name = nm
+            FileOffset = ofs
+            FileSize = sz
+        End Sub
+    End Class
 End Class
 
-
+<Serializable>
+Public Class PieceModelSaver
+    Public Property SaveData As List(Of PieceModel)
+    Public Function GetSerializedText() As String
+        Dim writer As New System.Xml.Serialization.XmlSerializer(GetType(PieceModelSaver))
+        Dim sb As New System.Text.StringBuilder()
+        Dim t As IO.TextWriter = New IO.StringWriter(sb)
+        writer.Serialize(t, Me)
+        t.Close()
+        Return sb.ToString
+    End Function
+    Public Sub SaveSerializedText(ByVal FileName As String)
+        Dim writer As New System.Xml.Serialization.XmlSerializer(GetType(PieceModelSaver))
+        Dim ms As New IO.FileStream(FileName, IO.FileMode.Create)
+        Dim t As IO.TextWriter = New IO.StreamWriter(ms, New System.Text.UTF8Encoding(False))
+        writer.Serialize(t, Me)
+        ms.Close()
+    End Sub
+    Public Shared Function FromXML(s As String) As PieceModelSaver
+        Dim reader As New System.Xml.Serialization.XmlSerializer(GetType(PieceModelSaver))
+        Dim t As IO.TextReader = New IO.StringReader(s)
+        Return CType(reader.Deserialize(t), PieceModelSaver)
+    End Function
+End Class
 
 Public Class TorrentMapper
 
@@ -477,7 +577,7 @@ Public Class TorrentMapper
                 .Index = i,
                 .StartOffset = pieceStart,
                 .Length = length,
-                .Files = New List(Of (Name As String, FileOffset As Long, FileSize As Long))(2)
+                .Files = New List(Of PieceModel.FileSegment)(2)
             }
 
             ' 👉 推进 fileIndex（只前进，不回退）
@@ -496,7 +596,7 @@ Public Class TorrentMapper
                 Dim fileSize = files(idx).Item2
                 Dim fileEnd = off + fileSize
 
-                p.Files.Add((files(idx).Item1, off, fileSize))
+                p.Files.Add(New PieceModel.FileSegment(files(idx).Item1, off, fileSize))
 
                 Dim take = Math.Min(remain, fileEnd - curOffset)
 

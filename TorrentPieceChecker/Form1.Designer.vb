@@ -31,6 +31,10 @@ Partial Class Form1
         Me.btnScaleUp = New System.Windows.Forms.Button()
         Me.btnScaleDown = New System.Windows.Forms.Button()
         Me.btnFolderBrowser = New System.Windows.Forms.Button()
+        Me.chkState0 = New System.Windows.Forms.CheckBox()
+        Me.chkState1 = New System.Windows.Forms.CheckBox()
+        Me.btnImportPieces = New System.Windows.Forms.Button()
+        Me.btnExportPieces = New System.Windows.Forms.Button()
         CType(Me.dgv, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.panelMap.SuspendLayout()
         CType(Me.pictureBoxBlk, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -43,14 +47,14 @@ Partial Class Form1
         Me.btnOpen.Name = "btnOpen"
         Me.btnOpen.Size = New System.Drawing.Size(75, 23)
         Me.btnOpen.TabIndex = 0
-        Me.btnOpen.Text = "打开"
+        Me.btnOpen.Text = "打开种子"
         Me.btnOpen.UseVisualStyleBackColor = True
         '
         'btnCheck
         '
         Me.btnCheck.Enabled = False
         Me.btnCheck.FlatStyle = System.Windows.Forms.FlatStyle.System
-        Me.btnCheck.Location = New System.Drawing.Point(120, 12)
+        Me.btnCheck.Location = New System.Drawing.Point(10, 39)
         Me.btnCheck.Name = "btnCheck"
         Me.btnCheck.Size = New System.Drawing.Size(75, 23)
         Me.btnCheck.TabIndex = 1
@@ -68,7 +72,7 @@ Partial Class Form1
         Me.dgv.Location = New System.Drawing.Point(10, 68)
         Me.dgv.Name = "dgv"
         Me.dgv.ScrollBars = System.Windows.Forms.ScrollBars.Vertical
-        Me.dgv.Size = New System.Drawing.Size(284, 339)
+        Me.dgv.Size = New System.Drawing.Size(284, 317)
         Me.dgv.TabIndex = 5
         Me.dgv.VirtualMode = True
         '
@@ -116,9 +120,9 @@ Partial Class Form1
         '
         Me.txtDir.Anchor = CType(((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Left) _
             Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
-        Me.txtDir.Location = New System.Drawing.Point(10, 41)
+        Me.txtDir.Location = New System.Drawing.Point(172, 14)
         Me.txtDir.Name = "txtDir"
-        Me.txtDir.Size = New System.Drawing.Size(878, 21)
+        Me.txtDir.Size = New System.Drawing.Size(797, 21)
         Me.txtDir.TabIndex = 4
         Me.txtDir.Text = "I:\Minerva_Myrient"
         '
@@ -137,7 +141,7 @@ Partial Class Form1
         'btnStop
         '
         Me.btnStop.FlatStyle = System.Windows.Forms.FlatStyle.System
-        Me.btnStop.Location = New System.Drawing.Point(201, 12)
+        Me.btnStop.Location = New System.Drawing.Point(91, 39)
         Me.btnStop.Name = "btnStop"
         Me.btnStop.Size = New System.Drawing.Size(75, 23)
         Me.btnStop.TabIndex = 2
@@ -148,7 +152,7 @@ Partial Class Form1
         Me.btnDraw.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.btnDraw.Enabled = False
         Me.btnDraw.FlatStyle = System.Windows.Forms.FlatStyle.System
-        Me.btnDraw.Location = New System.Drawing.Point(894, 12)
+        Me.btnDraw.Location = New System.Drawing.Point(894, 39)
         Me.btnDraw.Name = "btnDraw"
         Me.btnDraw.Size = New System.Drawing.Size(75, 23)
         Me.btnDraw.TabIndex = 3
@@ -160,7 +164,7 @@ Partial Class Form1
         Me.btnScaleUp.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.btnScaleUp.Enabled = False
         Me.btnScaleUp.FlatStyle = System.Windows.Forms.FlatStyle.System
-        Me.btnScaleUp.Location = New System.Drawing.Point(840, 12)
+        Me.btnScaleUp.Location = New System.Drawing.Point(840, 39)
         Me.btnScaleUp.Name = "btnScaleUp"
         Me.btnScaleUp.Size = New System.Drawing.Size(21, 23)
         Me.btnScaleUp.TabIndex = 8
@@ -172,7 +176,7 @@ Partial Class Form1
         Me.btnScaleDown.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.btnScaleDown.Enabled = False
         Me.btnScaleDown.FlatStyle = System.Windows.Forms.FlatStyle.System
-        Me.btnScaleDown.Location = New System.Drawing.Point(867, 12)
+        Me.btnScaleDown.Location = New System.Drawing.Point(867, 39)
         Me.btnScaleDown.Name = "btnScaleDown"
         Me.btnScaleDown.Size = New System.Drawing.Size(21, 23)
         Me.btnScaleDown.TabIndex = 9
@@ -181,20 +185,71 @@ Partial Class Form1
         '
         'btnFolderBrowser
         '
-        Me.btnFolderBrowser.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.btnFolderBrowser.FlatStyle = System.Windows.Forms.FlatStyle.System
-        Me.btnFolderBrowser.Location = New System.Drawing.Point(894, 39)
+        Me.btnFolderBrowser.Location = New System.Drawing.Point(91, 12)
         Me.btnFolderBrowser.Name = "btnFolderBrowser"
         Me.btnFolderBrowser.Size = New System.Drawing.Size(75, 23)
         Me.btnFolderBrowser.TabIndex = 10
-        Me.btnFolderBrowser.Text = "选择"
+        Me.btnFolderBrowser.Text = "选择路径"
         Me.btnFolderBrowser.UseVisualStyleBackColor = True
+        '
+        'chkState0
+        '
+        Me.chkState0.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
+        Me.chkState0.AutoSize = True
+        Me.chkState0.Checked = True
+        Me.chkState0.CheckState = System.Windows.Forms.CheckState.Checked
+        Me.chkState0.Location = New System.Drawing.Point(12, 391)
+        Me.chkState0.Name = "chkState0"
+        Me.chkState0.Size = New System.Drawing.Size(60, 16)
+        Me.chkState0.TabIndex = 11
+        Me.chkState0.Text = "未校验"
+        Me.chkState0.UseVisualStyleBackColor = True
+        '
+        'chkState1
+        '
+        Me.chkState1.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
+        Me.chkState1.AutoSize = True
+        Me.chkState1.Checked = True
+        Me.chkState1.CheckState = System.Windows.Forms.CheckState.Checked
+        Me.chkState1.Location = New System.Drawing.Point(78, 391)
+        Me.chkState1.Name = "chkState1"
+        Me.chkState1.Size = New System.Drawing.Size(48, 16)
+        Me.chkState1.TabIndex = 12
+        Me.chkState1.Text = "错误"
+        Me.chkState1.UseVisualStyleBackColor = True
+        '
+        'btnImportPieces
+        '
+        Me.btnImportPieces.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
+        Me.btnImportPieces.FlatStyle = System.Windows.Forms.FlatStyle.System
+        Me.btnImportPieces.Location = New System.Drawing.Point(192, 387)
+        Me.btnImportPieces.Name = "btnImportPieces"
+        Me.btnImportPieces.Size = New System.Drawing.Size(48, 23)
+        Me.btnImportPieces.TabIndex = 13
+        Me.btnImportPieces.Text = "导入"
+        Me.btnImportPieces.UseVisualStyleBackColor = True
+        '
+        'btnExportPieces
+        '
+        Me.btnExportPieces.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
+        Me.btnExportPieces.FlatStyle = System.Windows.Forms.FlatStyle.System
+        Me.btnExportPieces.Location = New System.Drawing.Point(246, 387)
+        Me.btnExportPieces.Name = "btnExportPieces"
+        Me.btnExportPieces.Size = New System.Drawing.Size(48, 23)
+        Me.btnExportPieces.TabIndex = 14
+        Me.btnExportPieces.Text = "导出"
+        Me.btnExportPieces.UseVisualStyleBackColor = True
         '
         'Form1
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 12.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.ClientSize = New System.Drawing.Size(981, 559)
+        Me.Controls.Add(Me.btnExportPieces)
+        Me.Controls.Add(Me.btnImportPieces)
+        Me.Controls.Add(Me.chkState1)
+        Me.Controls.Add(Me.chkState0)
         Me.Controls.Add(Me.btnFolderBrowser)
         Me.Controls.Add(Me.btnScaleDown)
         Me.Controls.Add(Me.btnScaleUp)
@@ -229,4 +284,8 @@ Partial Class Form1
     Friend WithEvents btnScaleUp As Button
     Friend WithEvents btnScaleDown As Button
     Friend WithEvents btnFolderBrowser As Button
+    Friend WithEvents chkState0 As CheckBox
+    Friend WithEvents chkState1 As CheckBox
+    Friend WithEvents btnImportPieces As Button
+    Friend WithEvents btnExportPieces As Button
 End Class
