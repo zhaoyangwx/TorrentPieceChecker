@@ -35,9 +35,12 @@ Partial Class Form1
         Me.chkState1 = New System.Windows.Forms.CheckBox()
         Me.btnImportPieces = New System.Windows.Forms.Button()
         Me.btnExportPieces = New System.Windows.Forms.Button()
+        Me.ContextMenuStrip1 = New System.Windows.Forms.ContextMenuStrip(Me.components)
+        Me.复制ToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         CType(Me.dgv, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.panelMap.SuspendLayout()
         CType(Me.pictureBoxBlk, System.ComponentModel.ISupportInitialize).BeginInit()
+        Me.ContextMenuStrip1.SuspendLayout()
         Me.SuspendLayout()
         '
         'btnOpen
@@ -109,6 +112,7 @@ Partial Class Form1
         '
         'pictureBoxBlk
         '
+        Me.pictureBoxBlk.ContextMenuStrip = Me.ContextMenuStrip1
         Me.pictureBoxBlk.Location = New System.Drawing.Point(0, 0)
         Me.pictureBoxBlk.Name = "pictureBoxBlk"
         Me.pictureBoxBlk.Size = New System.Drawing.Size(100, 50)
@@ -241,6 +245,18 @@ Partial Class Form1
         Me.btnExportPieces.Text = "导出"
         Me.btnExportPieces.UseVisualStyleBackColor = True
         '
+        'ContextMenuStrip1
+        '
+        Me.ContextMenuStrip1.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.复制ToolStripMenuItem})
+        Me.ContextMenuStrip1.Name = "ContextMenuStrip1"
+        Me.ContextMenuStrip1.Size = New System.Drawing.Size(181, 48)
+        '
+        '复制ToolStripMenuItem
+        '
+        Me.复制ToolStripMenuItem.Name = "复制ToolStripMenuItem"
+        Me.复制ToolStripMenuItem.Size = New System.Drawing.Size(180, 22)
+        Me.复制ToolStripMenuItem.Text = "复制"
+        '
         'Form1
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 12.0!)
@@ -269,6 +285,7 @@ Partial Class Form1
         Me.panelMap.ResumeLayout(False)
         Me.panelMap.PerformLayout()
         CType(Me.pictureBoxBlk, System.ComponentModel.ISupportInitialize).EndInit()
+        Me.ContextMenuStrip1.ResumeLayout(False)
         Me.ResumeLayout(False)
         Me.PerformLayout()
 
@@ -288,4 +305,6 @@ Partial Class Form1
     Friend WithEvents chkState1 As CheckBox
     Friend WithEvents btnImportPieces As Button
     Friend WithEvents btnExportPieces As Button
+    Friend WithEvents ContextMenuStrip1 As ContextMenuStrip
+    Friend WithEvents 复制ToolStripMenuItem As ToolStripMenuItem
 End Class

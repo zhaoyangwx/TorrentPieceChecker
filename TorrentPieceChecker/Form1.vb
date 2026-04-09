@@ -80,31 +80,44 @@ Public Class Form1
         Dim fileStreams As New Dictionary(Of String, FileStream)
         Dim lastRefreshTime As Date = Now
         DrawMapFast()
-        For i = 0 To Pieces.Count - 1
-            If Not Pieces(i).Checked Then Continue For
+        Dim running As Boolean = True
+        Task.Run(Sub()
+                     Try
+                         For i = 0 To Pieces.Count - 1
+                             If Not Pieces(i).Checked Then Continue For
 
-            Dim state = PieceChecker.Check(TorrentObj, Pieces(i), txtDir.Text, fileStreams)
-            Pieces(i).State = state
-            If state = 1 Then Pieces(i).Checked = False
-            If state >= 2 OrElse (Now - lastRefreshTime).TotalMilliseconds >= 300 Then
-                lastRefreshTime = Now
-                dgv.InvalidateRow(i)
-                If forceRedraw Then
-                    forceRedraw = False
-                    InitMap(False)
-                End If
-                DrawMapFast()
-                EnsureRowVisible(i)
-            End If
+                             Dim state = PieceChecker.Check(TorrentObj, Pieces(i), txtDir.Text, fileStreams)
+                             Pieces(i).State = state
+                             If state = 1 Then Pieces(i).Checked = False
+                             If state >= 2 OrElse (Now - lastRefreshTime).TotalMilliseconds >= 300 Then
+                                 lastRefreshTime = Now
+                                 Invoke(Sub() dgv.InvalidateRow(i))
+                                 If forceRedraw Then
+                                     forceRedraw = False
+                                     Invoke(Sub() InitMap(False))
+                                 End If
+                                 Invoke(Sub() DrawMapFast())
+                                 Invoke(Sub() EnsureRowVisible(i))
+                             End If
 
+                             If stopFlag Then
+                                 For Each fs In fileStreams.Values
+                                     fs.Dispose()
+                                 Next
+                                 Exit For
+                             End If
+                         Next
+                     Catch
+                     End Try
+                 End Sub).ContinueWith(
+                 Sub()
+                     running = False
+                     Invoke(Sub() DrawMapFast())
+                 End Sub)
+        While running
             Application.DoEvents()
-            If stopFlag Then
-                For Each fs In fileStreams.Values
-                    fs.Dispose()
-                Next
-                Exit For
-            End If
-        Next
+        End While
+
         For Each fs In fileStreams.Values
             fs.Dispose()
         Next
@@ -157,7 +170,7 @@ Public Class Form1
                 dgv.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.LightCoral
             Case 3
                 dgv.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.Orange
-            Case 3
+            Case 4
                 dgv.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.Plum
             Case Else
                 dgv.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.White
@@ -372,6 +385,8 @@ Public Class Form1
                 If imp.SaveData IsNot Nothing AndAlso imp.SaveData.Count > 0 Then
                     Pieces = imp.SaveData
                     dgv.Invalidate()
+                    InitMap(False)
+                    DrawMapFast()
                 End If
             End If
         End With
@@ -386,6 +401,9 @@ Public Class Form1
         End With
     End Sub
 
+    Private Sub 复制ToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 复制ToolStripMenuItem.Click
+        If mapBitmap IsNot Nothing Then Clipboard.SetImage(mapBitmap)
+    End Sub
 End Class
 
 
