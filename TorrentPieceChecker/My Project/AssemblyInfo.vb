@@ -8,7 +8,7 @@ Imports System.Runtime.InteropServices
 
 '查看程序集特性的值
 
-<Assembly: AssemblyTitle("TorrentPieceChecker")>
+<Assembly: AssemblyTitle("Torrent Piece Checker")>
 <Assembly: AssemblyDescription("")>
 <Assembly: AssemblyCompany("")>
 <Assembly: AssemblyProduct("TorrentPieceChecker")>

@@ -5,6 +5,7 @@ Imports BencodeNET.Parsing
 Imports System.Security.Cryptography
 Imports System.ComponentModel
 Imports System.Buffers
+Imports System.Runtime.Remoting.Messaging
 
 Public Class Form1
 
@@ -53,7 +54,7 @@ Public Class Form1
         pictureBoxBlk.Image = mapBitmap
     End Sub
     Private Sub btnOpen_Click(sender As Object, e As EventArgs) Handles btnOpen.Click
-        Dim ofd As New OpenFileDialog()
+        Dim ofd As New OpenFileDialog() With {.Filter = "torrent|*.torrent|any|*.*"}
         If ofd.ShowDialog() = DialogResult.OK Then
             Dim res = TorrentMapper.Load(ofd.FileName, Sub(i As Long, piececount As Long)
                                                            If i Mod 1000 = 0 Then
@@ -68,6 +69,7 @@ Public Class Form1
             InitMap()
             DrawMapFast()
             txtInfo.Text = $"Loaded: {ofd.FileName}{vbCrLf}Piece count: {Pieces.Count}"
+            Text = $"{My.Application.Info.Title} - {ofd.FileName}"
             btnCheck.Enabled = True
             btnDraw.Enabled = True
             btnScaleUp.Enabled = True
@@ -79,34 +81,46 @@ Public Class Form1
         stopFlag = False
         Dim fileStreams As New Dictionary(Of String, FileStream)
         Dim lastRefreshTime As Date = Now
+        Dim path As String = txtDir.Text
         DrawMapFast()
         Dim running As Boolean = True
         Task.Run(Sub()
                      Try
                          For i = 0 To Pieces.Count - 1
-                             If Not Pieces(i).Checked Then Continue For
+                             Dim idx As Integer = i
+                             If Not Pieces(idx).Checked Then Continue For
+                             Dim state As Integer
+                             Pieces(idx).State = -1
+                             Dim t = PieceChecker.CheckAsync(TorrentObj, Pieces(idx), path, fileStreams)
+                             t.ContinueWith(Sub()
+                                                state = t.Result
+                                                Pieces(idx).State = state
+                                                If state = 1 Then Pieces(idx).Checked = False
+                                                Dim intv As Integer = (Now - lastRefreshTime).TotalMilliseconds
+                                                If (state >= 2 AndAlso intv >= 50) OrElse intv >= 300 Then
+                                                    lastRefreshTime = Now
+                                                    Invoke(Sub() dgv.InvalidateRow(idx))
+                                                    If forceRedraw Then
+                                                        forceRedraw = False
+                                                        Invoke(Sub() InitMap(False))
+                                                    End If
+                                                    Invoke(Sub() DrawMapFast())
+                                                    Invoke(Sub() EnsureRowVisible(idx))
+                                                End If
 
-                             Dim state = PieceChecker.Check(TorrentObj, Pieces(i), txtDir.Text, fileStreams)
-                             Pieces(i).State = state
-                             If state = 1 Then Pieces(i).Checked = False
-                             If state >= 2 OrElse (Now - lastRefreshTime).TotalMilliseconds >= 300 Then
-                                 lastRefreshTime = Now
-                                 Invoke(Sub() dgv.InvalidateRow(i))
-                                 If forceRedraw Then
-                                     forceRedraw = False
-                                     Invoke(Sub() InitMap(False))
-                                 End If
-                                 Invoke(Sub() DrawMapFast())
-                                 Invoke(Sub() EnsureRowVisible(i))
-                             End If
-
-                             If stopFlag Then
-                                 For Each fs In fileStreams.Values
-                                     fs.Dispose()
-                                 Next
-                                 Exit For
-                             End If
+                                                If stopFlag Then
+                                                    For Each fs In fileStreams.Values
+                                                        Try
+                                                            fs.Close()
+                                                            fs.Dispose()
+                                                        Catch
+                                                        End Try
+                                                    Next
+                                                End If
+                                            End Sub)
+                             If stopFlag Then Exit For
                          Next
+
                      Catch
                      End Try
                  End Sub).ContinueWith(
@@ -119,7 +133,11 @@ Public Class Form1
         End While
 
         For Each fs In fileStreams.Values
-            fs.Dispose()
+            Try
+                fs.Close()
+                fs.Dispose()
+            Catch
+            End Try
         Next
     End Sub
     Private Sub btnStop_Click(sender As Object, e As EventArgs) Handles btnStop.Click
@@ -189,14 +207,13 @@ Public Class Form1
         If i >= first AndAlso i <= last Then Return
 
         ' 👇 不在范围 → 滚动（居中更舒服）
-        Dim target = Math.Max(0, i - visibleCount \ 3)
+        Dim target = Math.Max(0, i - visibleCount \ 4)
         dgv.FirstDisplayedScrollingRowIndex = target
 
     End Sub
     Private Sub DrawMapFast()
 
         If Pieces Is Nothing OrElse mapGraphics Is Nothing Then Return
-
         For i = 0 To Pieces.Count - 1
 
             If Pieces(i).State = lastStates(i) Then Continue For
@@ -207,22 +224,21 @@ Public Class Form1
             Dim x = col * (blockSize + gap)
             Dim y = row * (blockSize + gap)
 
-
             Dim c As Color = Color.Gray
+            If Pieces(i).State = PieceModel.PieceState.Checking Then c = Color.White
             If Pieces(i).State = PieceModel.PieceState.Pass Then c = Color.LimeGreen
             If Pieces(i).State = PieceModel.PieceState.Fail Then c = Color.Red
             If Pieces(i).State = PieceModel.PieceState.FileMissing Then c = Color.Orange
             If Pieces(i).State = PieceModel.PieceState.CannotOpenFile Then c = Color.DarkViolet
-
             Using br As New SolidBrush(c)
                 mapGraphics.FillRectangle(br, x, y, blockSize, blockSize)
             End Using
 
             lastStates(i) = Pieces(i).State
         Next
-
         pictureBoxBlk.Invalidate() ' 只触发重绘
     End Sub
+
     Private Sub PrintBlockDetails(idx As Integer)
         Dim p = Pieces(idx)
 
@@ -377,6 +393,17 @@ Public Class Form1
         Next
         dgv.Invalidate()
     End Sub
+    Private Sub lblSetState_Click(sender As Object, e As EventArgs) Handles lblSetState.Click
+        If Not torrentLoaded Then Exit Sub
+        Dim state As Integer
+        If Integer.TryParse(InputBox("State", "设置状态", "0"), state) Then
+            For Each r As DataGridViewRow In dgv.SelectedRows
+                Pieces(r.Index).State = state
+            Next
+            dgv.Invalidate()
+            DrawMapFast()
+        End If
+    End Sub
 
     Private Sub btnImportPieces_Click(sender As Object, e As EventArgs) Handles btnImportPieces.Click
         With (New OpenFileDialog With {.Filter = "xml|*.xml|any|*.*"})
@@ -403,6 +430,24 @@ Public Class Form1
 
     Private Sub 复制ToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 复制ToolStripMenuItem.Click
         If mapBitmap IsNot Nothing Then Clipboard.SetImage(mapBitmap)
+    End Sub
+
+    Private Sub 导出文件列表ToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 导出文件列表ToolStripMenuItem.Click
+        With (New SaveFileDialog With {.Filter = "txt|*.txt|any|*.*"})
+            If .ShowDialog = DialogResult.OK Then
+                Using fs As New IO.FileStream(.FileName, FileMode.Create)
+                    Dim outf As New IO.StreamWriter(fs)
+                    Dim files = If(TorrentObj.FileMode = TorrentFileMode.Single,
+                                    {TorrentObj.File}.Select(Function(f) (f.FileName, f.FileSize)).ToList(),
+                                    TorrentObj.Files.Select(Function(f) (f.FullPath, f.FileSize)).ToList())
+                    For Each p In files
+                        If p.Item1.StartsWith(".pad") Then Continue For
+                        outf.WriteLine(p.Item1)
+                    Next
+                    outf.Close()
+                End Using
+            End If
+        End With
     End Sub
 End Class
 
@@ -493,7 +538,7 @@ Public Class PieceChecker
             End If
 
         Next
-
+        If sha1hasher Is Nothing Then sha1hasher = SHA1.Create()
         Dim hash = sha1hasher.ComputeHash(buffer, 0, p.Length)
         ArrayPool(Of Byte).Shared.Return(buffer)
         Dim target(19) As Byte
@@ -502,7 +547,100 @@ Public Class PieceChecker
         Return If(hash.SequenceEqual(target), 1, 2)
 
     End Function
+    Public Shared Function CheckAsync(t As Torrent, p As PieceModel, baseDir As String,
+           fileStreams As Dictionary(Of String, FileStream)) As Task(Of Integer)
+        Dim buffer() As Byte = ArrayPool(Of Byte).Shared.Rent(p.Length)
 
+        Dim written As Integer = 0
+        Dim globalOffset = p.StartOffset
+
+        For Each f In p.Files
+
+            Dim start = f.FileOffset
+            Dim [end] = f.FileOffset + f.FileSize
+
+            If globalOffset < [end] AndAlso written < p.Length Then
+
+                If Not f.Name.StartsWith(".pad", StringComparison.OrdinalIgnoreCase) Then
+
+                    Dim path = IO.Path.Combine(baseDir, f.Name)
+
+                    ' 🔥 每次都判断存在（满足你的需求）
+                    If Not File.Exists(path) Then
+
+                        ' 👉 如果之前有缓存，要清掉
+                        If fileStreams.ContainsKey(path) Then
+                            fileStreams(path).Dispose()
+                            fileStreams.Remove(path)
+                        End If
+                        ArrayPool(Of Byte).Shared.Return(buffer)
+                        Return Task.Run(Function() As Integer
+                                            Return 3
+                                        End Function)
+                    End If
+
+                    ' 👉 获取或创建 FileStream（核心优化）
+                    Dim fs As FileStream = Nothing
+
+                    If Not fileStreams.TryGetValue(path, fs) Then
+                        Try
+                            fs = New FileStream(
+                                                   path,
+                                                   FileMode.Open,
+                                                   FileAccess.Read,
+                                                   FileShare.ReadWrite,   ' 🔥 支持用户修改文件
+                                                   4096,
+                                                   FileOptions.SequentialScan)
+                        Catch ex As Exception
+                            ArrayPool(Of Byte).Shared.Return(buffer)
+                            Return Task.Run(Function() As Integer
+                                                Return 4
+                                            End Function)
+                        End Try
+
+
+                        fileStreams(path) = fs
+                    End If
+
+                    ' 👉 计算读取位置
+                    Dim readStart = Math.Max(0, globalOffset - start)
+
+                    If fs.Position <> readStart Then
+                        fs.Position = readStart
+                    End If
+
+                    While written < p.Length AndAlso fs.Position < fs.Length
+
+                        Dim fileRemain = [end] - (start + readStart)
+                        If fileRemain <= 0 Then Exit While
+
+                        Dim need = Math.Min(p.Length - written, fileRemain)
+
+                        Dim r = fs.Read(buffer, written, need)
+                        If r = 0 Then Exit While
+
+                        written += r
+
+                    End While
+                    If fs.Position = fs.Length Then
+                        fs.Close()
+                        fileStreams.Remove(path)
+                    End If
+                End If
+
+            End If
+
+        Next
+        Dim hash As Byte() = {}
+        Dim target(19) As Byte
+        Return Task.Run(Function() As Integer
+                            Dim hasher = SHA1.Create()
+                            hash = hasher.ComputeHash(buffer, 0, p.Length)
+                            ArrayPool(Of Byte).Shared.Return(buffer)
+                            Array.Copy(t.Pieces, p.Index * 20, target, 0, 20)
+                            Return If(hash.SequenceEqual(target), 1, 2)
+                        End Function)
+    End Function
 End Class
 
 <Serializable>
@@ -518,6 +656,7 @@ Public Class PieceModel
         Fail = 2I
         FileMissing = 3I
         CannotOpenFile = 4I
+        Checking = -1I
     End Enum
     Public Property Checked As Boolean = True
     <Serializable>

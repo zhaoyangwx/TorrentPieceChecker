@@ -23,6 +23,8 @@ Partial Class Form1
         Me.DataGridViewTextBoxColumn3 = New System.Windows.Forms.DataGridViewTextBoxColumn()
         Me.panelMap = New System.Windows.Forms.Panel()
         Me.pictureBoxBlk = New System.Windows.Forms.PictureBox()
+        Me.ContextMenuStrip1 = New System.Windows.Forms.ContextMenuStrip(Me.components)
+        Me.复制ToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.txtDir = New System.Windows.Forms.TextBox()
         Me.txtInfo = New System.Windows.Forms.TextBox()
         Me.btnStop = New System.Windows.Forms.Button()
@@ -35,8 +37,8 @@ Partial Class Form1
         Me.chkState1 = New System.Windows.Forms.CheckBox()
         Me.btnImportPieces = New System.Windows.Forms.Button()
         Me.btnExportPieces = New System.Windows.Forms.Button()
-        Me.ContextMenuStrip1 = New System.Windows.Forms.ContextMenuStrip(Me.components)
-        Me.复制ToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
+        Me.lblSetState = New System.Windows.Forms.Label()
+        Me.导出文件列表ToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         CType(Me.dgv, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.panelMap.SuspendLayout()
         CType(Me.pictureBoxBlk, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -119,6 +121,18 @@ Partial Class Form1
         Me.pictureBoxBlk.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize
         Me.pictureBoxBlk.TabIndex = 0
         Me.pictureBoxBlk.TabStop = False
+        '
+        'ContextMenuStrip1
+        '
+        Me.ContextMenuStrip1.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.复制ToolStripMenuItem, Me.导出文件列表ToolStripMenuItem})
+        Me.ContextMenuStrip1.Name = "ContextMenuStrip1"
+        Me.ContextMenuStrip1.Size = New System.Drawing.Size(181, 70)
+        '
+        '复制ToolStripMenuItem
+        '
+        Me.复制ToolStripMenuItem.Name = "复制ToolStripMenuItem"
+        Me.复制ToolStripMenuItem.Size = New System.Drawing.Size(180, 22)
+        Me.复制ToolStripMenuItem.Text = "复制"
         '
         'txtDir
         '
@@ -245,23 +259,28 @@ Partial Class Form1
         Me.btnExportPieces.Text = "导出"
         Me.btnExportPieces.UseVisualStyleBackColor = True
         '
-        'ContextMenuStrip1
+        'lblSetState
         '
-        Me.ContextMenuStrip1.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.复制ToolStripMenuItem})
-        Me.ContextMenuStrip1.Name = "ContextMenuStrip1"
-        Me.ContextMenuStrip1.Size = New System.Drawing.Size(181, 48)
+        Me.lblSetState.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
+        Me.lblSetState.AutoSize = True
+        Me.lblSetState.Location = New System.Drawing.Point(132, 392)
+        Me.lblSetState.Name = "lblSetState"
+        Me.lblSetState.Size = New System.Drawing.Size(53, 12)
+        Me.lblSetState.TabIndex = 16
+        Me.lblSetState.Text = "设定状态"
         '
-        '复制ToolStripMenuItem
+        '导出文件列表ToolStripMenuItem
         '
-        Me.复制ToolStripMenuItem.Name = "复制ToolStripMenuItem"
-        Me.复制ToolStripMenuItem.Size = New System.Drawing.Size(180, 22)
-        Me.复制ToolStripMenuItem.Text = "复制"
+        Me.导出文件列表ToolStripMenuItem.Name = "导出文件列表ToolStripMenuItem"
+        Me.导出文件列表ToolStripMenuItem.Size = New System.Drawing.Size(180, 22)
+        Me.导出文件列表ToolStripMenuItem.Text = "导出文件列表"
         '
         'Form1
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 12.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.ClientSize = New System.Drawing.Size(981, 559)
+        Me.Controls.Add(Me.lblSetState)
         Me.Controls.Add(Me.btnExportPieces)
         Me.Controls.Add(Me.btnImportPieces)
         Me.Controls.Add(Me.chkState1)
@@ -280,7 +299,7 @@ Partial Class Form1
         Me.DoubleBuffered = True
         Me.KeyPreview = True
         Me.Name = "Form1"
-        Me.Text = "Torrent Piece Checker PRO"
+        Me.Text = "Torrent Piece Checker"
         CType(Me.dgv, System.ComponentModel.ISupportInitialize).EndInit()
         Me.panelMap.ResumeLayout(False)
         Me.panelMap.PerformLayout()
@@ -307,4 +326,6 @@ Partial Class Form1
     Friend WithEvents btnExportPieces As Button
     Friend WithEvents ContextMenuStrip1 As ContextMenuStrip
     Friend WithEvents 复制ToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents lblSetState As Label
+    Friend WithEvents 导出文件列表ToolStripMenuItem As ToolStripMenuItem
 End Class
