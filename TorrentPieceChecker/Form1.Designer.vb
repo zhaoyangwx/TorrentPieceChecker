@@ -25,6 +25,10 @@ Partial Class Form1
         Me.pictureBoxBlk = New System.Windows.Forms.PictureBox()
         Me.ContextMenuStrip1 = New System.Windows.Forms.ContextMenuStrip(Me.components)
         Me.复制ToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
+        Me.导出文件列表ToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
+        Me.从当前块开始校验ToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
+        Me.统计已知缺失文件ToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
+        Me.检查文件缺失ToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.txtDir = New System.Windows.Forms.TextBox()
         Me.txtInfo = New System.Windows.Forms.TextBox()
         Me.btnStop = New System.Windows.Forms.Button()
@@ -38,7 +42,7 @@ Partial Class Form1
         Me.btnImportPieces = New System.Windows.Forms.Button()
         Me.btnExportPieces = New System.Windows.Forms.Button()
         Me.lblSetState = New System.Windows.Forms.Label()
-        Me.导出文件列表ToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
+        Me.导出文件列表源路径ToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         CType(Me.dgv, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.panelMap.SuspendLayout()
         CType(Me.pictureBoxBlk, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -124,15 +128,39 @@ Partial Class Form1
         '
         'ContextMenuStrip1
         '
-        Me.ContextMenuStrip1.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.复制ToolStripMenuItem, Me.导出文件列表ToolStripMenuItem})
+        Me.ContextMenuStrip1.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.复制ToolStripMenuItem, Me.导出文件列表ToolStripMenuItem, Me.导出文件列表源路径ToolStripMenuItem, Me.从当前块开始校验ToolStripMenuItem, Me.统计已知缺失文件ToolStripMenuItem, Me.检查文件缺失ToolStripMenuItem})
         Me.ContextMenuStrip1.Name = "ContextMenuStrip1"
-        Me.ContextMenuStrip1.Size = New System.Drawing.Size(181, 70)
+        Me.ContextMenuStrip1.Size = New System.Drawing.Size(209, 158)
         '
         '复制ToolStripMenuItem
         '
         Me.复制ToolStripMenuItem.Name = "复制ToolStripMenuItem"
-        Me.复制ToolStripMenuItem.Size = New System.Drawing.Size(180, 22)
+        Me.复制ToolStripMenuItem.Size = New System.Drawing.Size(172, 22)
         Me.复制ToolStripMenuItem.Text = "复制"
+        '
+        '导出文件列表ToolStripMenuItem
+        '
+        Me.导出文件列表ToolStripMenuItem.Name = "导出文件列表ToolStripMenuItem"
+        Me.导出文件列表ToolStripMenuItem.Size = New System.Drawing.Size(172, 22)
+        Me.导出文件列表ToolStripMenuItem.Text = "导出文件列表"
+        '
+        '从当前块开始校验ToolStripMenuItem
+        '
+        Me.从当前块开始校验ToolStripMenuItem.Name = "从当前块开始校验ToolStripMenuItem"
+        Me.从当前块开始校验ToolStripMenuItem.Size = New System.Drawing.Size(172, 22)
+        Me.从当前块开始校验ToolStripMenuItem.Text = "从当前块开始校验"
+        '
+        '统计已知缺失文件ToolStripMenuItem
+        '
+        Me.统计已知缺失文件ToolStripMenuItem.Name = "统计已知缺失文件ToolStripMenuItem"
+        Me.统计已知缺失文件ToolStripMenuItem.Size = New System.Drawing.Size(172, 22)
+        Me.统计已知缺失文件ToolStripMenuItem.Text = "统计已知缺失文件"
+        '
+        '检查文件缺失ToolStripMenuItem
+        '
+        Me.检查文件缺失ToolStripMenuItem.Name = "检查文件缺失ToolStripMenuItem"
+        Me.检查文件缺失ToolStripMenuItem.Size = New System.Drawing.Size(172, 22)
+        Me.检查文件缺失ToolStripMenuItem.Text = "重新检查文件缺失"
         '
         'txtDir
         '
@@ -269,11 +297,11 @@ Partial Class Form1
         Me.lblSetState.TabIndex = 16
         Me.lblSetState.Text = "设定状态"
         '
-        '导出文件列表ToolStripMenuItem
+        '导出文件列表源路径ToolStripMenuItem
         '
-        Me.导出文件列表ToolStripMenuItem.Name = "导出文件列表ToolStripMenuItem"
-        Me.导出文件列表ToolStripMenuItem.Size = New System.Drawing.Size(180, 22)
-        Me.导出文件列表ToolStripMenuItem.Text = "导出文件列表"
+        Me.导出文件列表源路径ToolStripMenuItem.Name = "导出文件列表源路径ToolStripMenuItem"
+        Me.导出文件列表源路径ToolStripMenuItem.Size = New System.Drawing.Size(208, 22)
+        Me.导出文件列表源路径ToolStripMenuItem.Text = "导出文件列表（源路径）"
         '
         'Form1
         '
@@ -328,4 +356,8 @@ Partial Class Form1
     Friend WithEvents 复制ToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents lblSetState As Label
     Friend WithEvents 导出文件列表ToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents 从当前块开始校验ToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents 统计已知缺失文件ToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents 检查文件缺失ToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents 导出文件列表源路径ToolStripMenuItem As ToolStripMenuItem
 End Class

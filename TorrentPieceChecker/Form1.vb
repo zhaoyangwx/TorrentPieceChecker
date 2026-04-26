@@ -6,6 +6,9 @@ Imports System.Security.Cryptography
 Imports System.ComponentModel
 Imports System.Buffers
 Imports System.Runtime.Remoting.Messaging
+Imports System.Threading
+Imports System.Runtime.InteropServices
+Imports System.Text
 
 Public Class Form1
 
@@ -48,7 +51,7 @@ Public Class Form1
         mapGraphics.Clear(Color.Black)
         ReDim lastStates(Pieces.Count - 1)
         For i = 0 To lastStates.Length - 1
-            lastStates(i) = -1 ' 强制首次全绘
+            lastStates(i) = -2 ' 强制首次全绘
         Next
 
         pictureBoxBlk.Image = mapBitmap
@@ -77,61 +80,76 @@ Public Class Form1
             torrentLoaded = True
         End If
     End Sub
-    Private Sub btnCheck_Click(sender As Object, e As EventArgs) Handles btnCheck.Click
+    Private Sub CheckBlocks(Optional ByVal startblk As Integer = 0, Optional ByVal endblk As Integer = -1)
+        If endblk = -1 Then endblk = Pieces.Count - 1
         stopFlag = False
         Dim fileStreams As New Dictionary(Of String, FileStream)
         Dim lastRefreshTime As Date = Now
         Dim path As String = txtDir.Text
         DrawMapFast()
-        Dim running As Boolean = True
+        Dim ChkRunningCount As Integer = 0
+        Dim thHashLim As Integer = Environment.ProcessorCount - 1
+        Dim IsRunning As Boolean = True
+        Dim RunningLim As New AutoResetEvent(False)
         Task.Run(Sub()
                      Try
-                         For i = 0 To Pieces.Count - 1
+                         For i = startblk To endblk
                              Dim idx As Integer = i
+                             While ChkRunningCount >= thHashLim
+                                 RunningLim.WaitOne(1)
+                             End While
                              If Not Pieces(idx).Checked Then Continue For
                              Dim state As Integer
                              Pieces(idx).State = -1
-                             Dim t = PieceChecker.CheckAsync(TorrentObj, Pieces(idx), path, fileStreams)
-                             t.ContinueWith(Sub()
-                                                state = t.Result
-                                                Pieces(idx).State = state
-                                                If state = 1 Then Pieces(idx).Checked = False
-                                                Dim intv As Integer = (Now - lastRefreshTime).TotalMilliseconds
-                                                If (state >= 2 AndAlso intv >= 50) OrElse intv >= 300 Then
-                                                    lastRefreshTime = Now
-                                                    Invoke(Sub() dgv.InvalidateRow(idx))
-                                                    If forceRedraw Then
-                                                        forceRedraw = False
-                                                        Invoke(Sub() InitMap(False))
-                                                    End If
-                                                    Invoke(Sub() DrawMapFast())
-                                                    Invoke(Sub() EnsureRowVisible(idx))
-                                                End If
+                             Threading.Interlocked.Increment(ChkRunningCount)
+                             With PieceChecker.CheckAsync(TorrentObj, Pieces(idx), path, fileStreams)
+                                 .ContinueWith(
+                                 Sub()
+                                     Threading.Interlocked.Decrement(ChkRunningCount)
+                                     RunningLim.Set()
+                                     state = .Result
+                                     Pieces(idx).State = state
+                                     If state = 1 Then Pieces(idx).Checked = False
+                                     Dim intv As Integer = (Now - lastRefreshTime).TotalMilliseconds
+                                     If (state >= 2 AndAlso intv >= 50) OrElse intv >= 300 Then
+                                         lastRefreshTime = Now
+                                         Invoke(Sub() dgv.InvalidateRow(idx))
+                                         If forceRedraw Then
+                                             forceRedraw = False
+                                             Invoke(Sub() InitMap(False))
+                                         End If
+                                         Invoke(Sub() DrawMapFast())
+                                         Invoke(Sub() EnsureRowVisible(idx))
+                                     End If
 
-                                                If stopFlag Then
-                                                    For Each fs In fileStreams.Values
-                                                        Try
-                                                            fs.Close()
-                                                            fs.Dispose()
-                                                        Catch
-                                                        End Try
-                                                    Next
-                                                End If
-                                            End Sub)
+                                     If stopFlag Then
+                                         While ChkRunningCount > 0
+                                             Application.DoEvents()
+                                         End While
+                                         For Each fs In fileStreams.Values
+                                             Try
+                                                 fs.Close()
+                                                 fs.Dispose()
+                                             Catch
+                                             End Try
+                                         Next
+                                     End If
+                                 End Sub)
+                             End With
+
                              If stopFlag Then Exit For
                          Next
+                     Catch ex As Exception
 
-                     Catch
                      End Try
-                 End Sub).ContinueWith(
-                 Sub()
-                     running = False
-                     Invoke(Sub() DrawMapFast())
+                     IsRunning = False
                  End Sub)
-        While running
+        While IsRunning OrElse ChkRunningCount > 0
             Application.DoEvents()
         End While
-
+        DrawMapFast()
+        pictureBoxBlk.Refresh()
+        dgv.Invalidate()
         For Each fs In fileStreams.Values
             Try
                 fs.Close()
@@ -139,6 +157,11 @@ Public Class Form1
             Catch
             End Try
         Next
+    End Sub
+    Private Sub btnCheck_Click(sender As Object, e As EventArgs) Handles btnCheck.Click
+        btnCheck.Enabled = False
+        CheckBlocks()
+        btnCheck.Enabled = True
     End Sub
     Private Sub btnStop_Click(sender As Object, e As EventArgs) Handles btnStop.Click
         stopFlag = True
@@ -161,6 +184,7 @@ Public Class Form1
 
             Case 2 ' 状态
                 Select Case p.State
+                    Case -1 : e.Value = "正在校验"
                     Case 0 : e.Value = "未校验"
                     Case 1 : e.Value = "OK"
                     Case 2 : e.Value = "FAIL"
@@ -277,12 +301,26 @@ Public Class Form1
 
         txtInfo.Text = sb.ToString()
     End Sub
+    Dim pbIdx As Integer = -1
+    Private Sub 从当前块开始校验ToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 从当前块开始校验ToolStripMenuItem.Click
+        CheckBlocks(pbIdx)
+    End Sub
+    Private Sub pictureBoxBlk_MouseUp(sender As Object, e As MouseEventArgs) Handles pictureBoxBlk.MouseUp
+        If Not torrentLoaded Then Exit Sub
+        Dim col = e.X \ (blockSize + gap)
+        Dim row = e.Y \ (blockSize + gap)
+
+        Dim idx = row * cols + col
+        pbIdx = idx
+    End Sub
+
     Private Sub pictureBoxBlk_MouseClick(sender As Object, e As MouseEventArgs) Handles pictureBoxBlk.MouseClick
         If Not torrentLoaded Then Exit Sub
         Dim col = e.X \ (blockSize + gap)
         Dim row = e.Y \ (blockSize + gap)
 
         Dim idx = row * cols + col
+        pbIdx = idx
         If idx < 0 OrElse idx >= Pieces.Count Then Return
         PrintBlockDetails(idx)
         EnsureRowVisible(idx)
@@ -347,6 +385,7 @@ Public Class Form1
     End Sub
 
     Private Sub Form1_Closing(sender As Object, e As CancelEventArgs) Handles Me.Closing
+        stopFlag = True
         My.Settings.lastPath = txtDir.Text
     End Sub
 
@@ -443,6 +482,99 @@ Public Class Form1
                     For Each p In files
                         If p.Item1.StartsWith(".pad") Then Continue For
                         outf.WriteLine(p.Item1)
+                    Next
+                    outf.Close()
+                End Using
+            End If
+        End With
+    End Sub
+
+    Private Sub 统计已知缺失文件ToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 统计已知缺失文件ToolStripMenuItem.Click
+        Dim result As New List(Of String)
+        Dim output As New StringBuilder
+        For i As Integer = 0 To Pieces.Count - 1
+            If Pieces(i).State = 3 Then
+                Dim p = Pieces(i)
+                ' 缺失优先排序
+                For Each f In p.Files.OrderBy(Function(x) IO.File.Exists(IO.Path.Combine(txtDir.Text, x.Name)))
+                    If f.Name.StartsWith(".pad", StringComparison.OrdinalIgnoreCase) Then Continue For
+                    Dim fname As String = IO.Path.Combine(txtDir.Text, f.Name)
+                    Dim exist As Boolean = IO.File.Exists(fname)
+                    If result.Contains(fname) Then exist = True
+                    If Not exist Then
+                        result.Add(fname)
+                        output.AppendLine(fname)
+                    End If
+                Next
+            End If
+        Next
+        txtInfo.Text = output.ToString()
+    End Sub
+
+    Private Sub 检查文件缺失ToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 检查文件缺失ToolStripMenuItem.Click
+        stopFlag = False
+        Dim statechanged As Boolean = False
+        Dim lastrefreshtime As Date = Now
+        For i As Integer = 0 To Pieces.Count - 1
+            If stopFlag Then Exit For
+            If Pieces(i).State = 0 Then
+                EnsureRowVisible(i)
+                Dim p = Pieces(i)
+                ' 缺失优先排序
+                For Each f In p.Files.OrderBy(Function(x) IO.File.Exists(IO.Path.Combine(txtDir.Text, x.Name)))
+                    If f.Name.StartsWith(".pad", StringComparison.OrdinalIgnoreCase) Then Continue For
+                    Dim fname As String = IO.Path.Combine(txtDir.Text, f.Name)
+                    Dim exist As Boolean = IO.File.Exists(fname)
+                    If Not exist Then
+                        p.State = 3
+                        statechanged = True
+                    End If
+                Next
+            ElseIf Pieces(i).State = 3 Then
+                EnsureRowVisible(i)
+                Dim p = Pieces(i)
+                Dim allexist As Boolean = True
+                For Each f In p.Files.OrderBy(Function(x) IO.File.Exists(IO.Path.Combine(txtDir.Text, x.Name)))
+                    If f.Name.StartsWith(".pad", StringComparison.OrdinalIgnoreCase) Then Continue For
+                    Dim fname As String = IO.Path.Combine(txtDir.Text, f.Name)
+                    allexist = allexist And IO.File.Exists(fname)
+                    If Not allexist Then Exit For
+                Next
+                If allexist Then
+                    p.State = 0
+                    statechanged = True
+                End If
+            End If
+            If (Now - lastrefreshtime).TotalMilliseconds > 200 Then
+                If statechanged Then
+                    DrawMapFast()
+                    statechanged = False
+                End If
+                Application.DoEvents()
+                lastrefreshtime = Now
+            End If
+
+        Next
+    End Sub
+
+    Private Sub 导出文件列表源路径ToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 导出文件列表源路径ToolStripMenuItem.Click
+        With (New SaveFileDialog With {.Filter = "txt|*.txt|any|*.*"})
+            If .ShowDialog = DialogResult.OK Then
+                Using fs As New IO.FileStream(.FileName, FileMode.Create)
+                    Dim outf As New IO.StreamWriter(fs)
+                    Dim files = If(TorrentObj.FileMode = TorrentFileMode.Single,
+                                    {TorrentObj.File}.Select(Function(f) (f.FileName, f.FileSize)).ToList(),
+                                    TorrentObj.Files.Select(Function(f) (f.FullPath, f.FileSize)).ToList())
+                    For Each p In files
+                        If p.Item1.StartsWith(".pad") Then Continue For
+                        Dim file As New IO.FileInfo(IO.Path.Combine(txtDir.Text, p.Item1))
+                        Dim fpath As String = file.FullName
+                        If IO.File.Exists(fpath) Then
+                            If (file.Attributes And FileAttributes.ReparsePoint) = FileAttributes.ReparsePoint Then
+                                fpath = SymlinkHelper.GetFinalTarget(fpath)
+                            End If
+                        End If
+                        outf.WriteLine(fpath)
                     Next
                     outf.Close()
                 End Using
